@@ -2,22 +2,161 @@
 import sys
 import os
 import time
-
+from openpyxl import Workbook
 from bs4 import BeautifulSoup
 from urlparse import urljoin
 from utils import (get_bs_from_static_site, extract_key_value_pairs_from_bs,
-                   remove_accents, write_tables_to_excel)
+                   remove_accents, write_ws)
+
+PARSER = "lxml"
+
+
+class TrafficData():
+
+    # DATA
+    WS_SIMPLE_TBL_NAME = "tbl_simple"
+    WS_DETAILS_TBL_NAME = "tbl_details"
+    FIELDS_SIMPLE_TBL = ["id_tramo", "Nro distrito", "Distrito",
+                         "Limites del tramo", "Ini", "Fin", "TMDA", "Mas Info",
+                         "Observaciones", "Link"]
+    FIELDS_DETAILS_TBL = ["id_tramo", "id_tabla", "variable", "fila", "valor"]
+    EXCEL_OUTPUT = "Datos de TMDA de la DNV - 2010 - corregido ruta 40.xlsx"
+
+    def __init__(self):
+
+        # create excel to save data
+        self.wb = Workbook(optimized_write=True)
+
+        # create sheet to store records of simple table
+        self.ws_simple = self.wb.create_sheet(title=self.WS_SIMPLE_TBL_NAME)
+
+        # create sheet to store records of details table
+        self.ws_details = self.wb.create_sheet(title=self.WS_DETAILS_TBL_NAME)
+
+    # PUBLIC
+    def write_simple_record(self, record):
+        write_ws(self.ws_simple, record, self.FIELDS_SIMPLE_TBL)
+
+    def write_details_record(self, record):
+        write_ws(self.ws_details, record, self.FIELDS_DETAILS_TBL)
+
+    def save(self, excel_output=None):
+        excel_output = excel_output or self.EXCEL_OUTPUT
+        self.wb.save(excel_output)
+
+
+class RoadScraper():
+
+    # DATA
+    PARSER = "lxml"
+    FIELDS_SIMPLE_TBL = ["id_tramo", "Nro distrito", "Distrito",
+                         "Limites del tramo", "Ini", "Fin", "TMDA", "Mas Info",
+                         "Observaciones", "Link"]
+    FIELDS_DETAILS_TBL = ["id_tramo", "id_tabla", "variable", "fila", "valor"]
+
+    def __init__(self, road_name, base_url, dict_rutas):
+
+        # scrape parameters
+        self.road_name = road_name
+        self.base_url = base_url
+        self.dict_rutas = dict_rutas
+
+        # results
+        self.tabla_ruta = []
+        self.tabla_ruta_ver_detalle_dict = {}
+        self.tabla_ruta_ver_detalle_db = []
+
+    # PUBLIC
+    def scrape(self):
+        """
+            toma la url de una ruta y devuelve 3 RVs en un arreglo:
+
+            (1) un arreglo con la tabla con todos los tramos de la ruta con un
+            codigo al principio identificador del tramo
+
+            (2) un diccionario con todas las tablas "ver detalle" de aquellos tramos
+            que no tienen promedio anual de la composicion pero si tienen un censo cobertura
+
+            (3) un arreglo que almacena todos los datos "ver detalle" incluso de los tramos
+            que no los tienen (con dicts vacios)
+        """
+
+        # parse base_url into a beautiful soup
+        bs_road = get_bs_from_static_site(self.base_url, self.PARSER)
+
+        # crea los arreglos y diccionarios que seran Return Values de la funcion
+        tabla_ruta_ver_detalle = []
+        tabla_ruta_censo_cobertura = {}
+
+        id_section = 0
+        # iterate rows
+        for tr in bs_road.find_all("tr"):
+
+            # get all elements of a row
+            row_elements = tr.find_all("td", {"class": "FILA"})
+
+            # check if row has 8 elements and proceed
+            if len(row_elements) == 8:
+
+                # new section has been found
+                id_section += 1
+                section_code = "{}_{}".format(self.road_name, id_section)
+                print "Procesando tramo ", section_code
+
+                # init a new row with section code
+                row = [section_code]
+
+                # iterate row elements adding each one to the row
+                for element in row_elements:
+                    row.append(element.get_text().strip())
+
+                # procesa los datos de "Ver detalle"
+                tablas_ver_detalle = {}
+                if row_elements[6].get_text() == "ver detalle":
+
+                    # agrega un campo más para el link del row_elements[6] (Ver detalle)
+                    # cuando existe
+                    link_part = row_elements[6].find_all("a")[0]["href"]
+                    url_ver_detalle = urljoin(self.dict_rutas[self.road_name], link_part)
+                    row.append(url_ver_detalle)
+
+                    # extrae todas las tablas de "ver detalle"
+                    tablas_ver_detalle = extract_tables_from_url_with_titles(
+                        url_ver_detalle)
+
+                else:
+                    row.append("")
+
+                # a la tabla_ruta le agrega la nueva fila de datos
+                self.tabla_ruta.append(row)
+
+                # agrega el diccionario de tablas extraidas de "ver detalle" con su
+                # titulo al arreglo contenedor
+                tabla_ruta_ver_detalle.append(tablas_ver_detalle)
+
+        # transforma el diccionario de tablas de "ver detalle" en un arreglo tipo
+        # tabla base de datos para excel
+        self.tabla_ruta_ver_detalle_db = transformar_ver_detalle_dict_en_tabla(
+            self.tabla_ruta, tabla_ruta_ver_detalle)
+
+    def get_simple_records(self):
+
+        for row in self.tabla_ruta:
+            yield dict(zip(self.FIELDS_SIMPLE_TBL, row))
+
+    def get_details_records(self):
+
+        for row in self.tabla_ruta_ver_detalle_db:
+            yield dict(zip(self.FIELDS_DETAILS_TBL, row))
 
 
 # DATA
 # scraping parameters
 metodo = "GET"
-parser = "lxml"
 base_url_part1 = "http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_"
 base_url_part2 = "/index.html"
 
 # other parameters
-excel_output = "Datos de TMDA de la DNV - 2010 - corregido ruta 40.xlsx"
 fields_simple_table = ["id_tramo", "Nro distrito", "Distrito",
                        "Limites del tramo", "Ini", "Fin", "TMDA",
                        "Mas Info", "Observaciones", "Link"]
@@ -38,7 +177,7 @@ def extract_tables_from_url_with_titles(url):
     """
 
     # convierto en soup el url estatico
-    soup = get_bs_from_static_site(url, parser)
+    soup = get_bs_from_static_site(url, PARSER)
 
     tablas = {}  # inicio un arreglo vacio para almacenar las tablas extraidas
 
@@ -109,87 +248,6 @@ def scrape_link_rutas(base_url, parser):
     return dict_rutas
 
 
-def scrape_ruta(nombre_ruta, base_url, parser):
-    """
-        toma la url de una ruta y devuelve 3 RVs en un arreglo:
-
-        (1) un arreglo con la tabla con todos los tramos de la ruta con un
-        codigo al principio identificador del tramo
-
-        (2) un diccionario con todas las tablas "ver detalle" de aquellos tramos
-        que no tienen promedio anual de la composicion pero si tienen un censo cobertura
-
-        (3) un arreglo que almacena todos los datos "ver detalle" incluso de los tramos
-        que no los tienen (con dicts vacios)
-    """
-
-    # toma el url ruta y lo convierte en una bs
-    soup_ruta = get_bs_from_static_site(base_url, parser)
-
-    # crea los arreglos y diccionarios que seran Return Values de la funcion
-    tabla_ruta = []
-    tabla_ruta_ver_detalle = []
-    tabla_ruta_censo_cobertura = {}
-
-    id_tramo = 0
-    # itera entre las filas que tienen datos (no encabaezado)
-    for tr in soup_ruta.find_all("tr"):
-        # lista de los elementos de una fila
-        tds = tr.find_all("td", {"class": "FILA"})
-
-        # procede si se encontraron elementos que cumplan con el atributo
-        # "FILA" en esa row
-        if len(tds) == 8:
-            id_tramo += 1
-            codigo_tramo = str(nombre_ruta) + "_" + str(id_tramo)
-            print "Procesando tramo ", codigo_tramo
-
-            # itera entre los elementos de una fila y los guarda en un arreglo
-            # row
-            row = [codigo_tramo]
-            for elemento in tds:
-                row.append(elemento.get_text().strip())
-
-            # procesa los datos de "Ver detalle"
-            tablas_ver_detalle = {}
-            if tds[6].get_text() == "ver detalle":
-
-                # agrega un campo más para el link del tds[6] (Ver detalle)
-                # cuando existe
-                link_part = tds[6].find_all("a")[0]["href"]
-                url_ver_detalle = urljoin(dict_rutas[nombre_ruta], link_part)
-                row.append(url_ver_detalle)
-
-                # extrae todas las tablas de "ver detalle"
-                tablas_ver_detalle = extract_tables_from_url_with_titles(
-                    url_ver_detalle)
-                #~ print id_tramo, tablas_ver_detalle.keys()
-
-            else:
-                row.append("")
-
-            # a la tabla_ruta le agrega la nueva fila de datos
-            tabla_ruta.append(row)
-
-            # ~ # agrega al diccionario de tramos que tienen "Censo Cobertura" pero no tienen "Promedio Anual"
-            #~ if not "promedioanual" in tablas_ver_detalle.keys() and "clasificacion" in tablas_ver_detalle.keys():
-            #~ tabla_ruta_censo_cobertura[codigo_tramo] = tablas_ver_detalle
-
-            # agrega el diccionario de tablas extraidas de "ver detalle" con su
-            # titulo al arreglo contenedor
-            tabla_ruta_ver_detalle.append(tablas_ver_detalle)
-
-    # guarda la tabla_ruta_ver_detalle en formato de diccionario de tablas
-    tabla_ruta_ver_detalle_dict = tabla_ruta_ver_detalle
-
-    # transforma el diccionario de tablas de "ver detalle" en un arreglo tipo
-    # tabla base de datos para excel
-    tabla_ruta_ver_detalle_db = transformar_ver_detalle_dict_en_tabla(
-        tabla_ruta, tabla_ruta_ver_detalle_dict)
-
-    return [tabla_ruta, tabla_ruta_ver_detalle_dict, tabla_ruta_ver_detalle_db]
-
-
 def transformar_ver_detalle_dict_en_tabla(tabla_ruta,
                                           tabla_ruta_ver_detalle_dict):
 
@@ -239,9 +297,8 @@ def transformar_ver_detalle_dict_en_tabla(tabla_ruta,
 
 def main():
 
-    # genera las variables para almacenar los resultados
-    tabla_simple = []
-    tabla_detalles = []
+    # create a TrafficData object to store scraped data
+    traffic_data = TrafficData()
 
     # llamado principal
     # itera por todos los años
@@ -254,7 +311,7 @@ def main():
         print "Tomando datos del anio: ", anio, "\n\n"
 
         # toma los links de las rutas
-        dict_rutas = scrape_link_rutas(anio_base_url, parser)
+        dict_rutas = scrape_link_rutas(anio_base_url, PARSER)
         #~ lista_rutas = dict_rutas.keys()
         lista_rutas = ["0040"]
 
@@ -264,18 +321,20 @@ def main():
             print "\nTomando los datos de la ruta: ", ruta, " en el anio: ",
             anio, "\n"
 
-            datos_ruta = scrape_ruta(ruta, dict_rutas[ruta], parser)
+            # create scraper for road and scrape it
+            road_scraper = RoadScraper(ruta, dict_rutas[ruta], dict_rutas)
+            road_scraper.scrape()
 
-            # toma los nuevos datos
-            tabla_simple.extend(datos_ruta[0])
-            tabla_detalles.extend(datos_ruta[2])
+            # write each simple record scraped to excel
+            for record in road_scraper.get_simple_records():
+                traffic_data.write_simple_record(record)
 
-    # RESULTADOS
-    # vuelca las tablas en un excel
-    Tablas = [tabla_simple, tabla_detalles]
-    print "\nVolcando resultados en excel..."
-    write_tables_to_excel(Tablas, excel_output, fields_array)
-    print "Completado."
+            # write each details record scraped to excel
+            for record in road_scraper.get_details_records():
+                traffic_data.write_details_record(record)
+
+        traffic_data.save()
+
 
 
 if __name__ == '__main__':

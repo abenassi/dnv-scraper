@@ -72,3 +72,24 @@ def write_tables_to_excel(tables, excel_output, fields=[]):
         num_table += 1
 
     wb.save(excel_output)
+
+
+def write_ws(ws, record, fields):
+    """Add a record to a worksheet.
+
+    Write fields first, if there are no records."""
+
+    # check if worksheet is empty
+    if ws.get_dimensions() == "A1":
+        ws.append(fields)
+
+    # add new row, with fields order
+    else:
+        new_row = []
+
+        # extract data with field keys from record
+        for field in fields:
+            new_row.append(record[field])
+
+        # add new row to worksheet
+        ws.append(new_row)
