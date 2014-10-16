@@ -45,7 +45,7 @@ class TestScrapeTrafficDataMethod(unittest.TestCase):
         # run scraper method
         scrape_traffic_data(years, roads, self.test_output_excel)
 
-    def test_equal(self):
+    def test_same_excels(self):
         self.assertTrue(compare_excels(self.test_compare_excel,
                                        self.test_output_excel))
 
@@ -53,7 +53,5 @@ class TestScrapeTrafficDataMethod(unittest.TestCase):
 def main():
     unittest.main()
 
-if __name__ == 'main':
+if __name__ == '__main__':
     main()
-
-main()

@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-import sys
-import os
-import time
 from bs4 import BeautifulSoup
 from urlparse import urljoin
 from utils import (get_bs_from_static_site, extract_key_value_pairs_from_bs,
@@ -13,7 +10,6 @@ PARSER = "lxml"
 
 
 class RoadScraper():
-
     """Scraper for data of a single road.
 
     A road has a table where each row has data of a section of the road. All
@@ -22,7 +18,7 @@ class RoadScraper():
 
     Some of them may also have a link to detail tables with more
     information. These detail tables are also grabbed and stored in
-    "detail_tables".
+    "details_tbl" as a list of records.
 
     RoadScraper provide methods to iterate through "simple" and "detail"
     records, once a road has been scraped.
@@ -50,16 +46,13 @@ class RoadScraper():
     def scrape(self):
         """Scrape data of each section of a road.
 
-            toma la url de una ruta y devuelve 3 RVs en un arreglo:
+        Feed "simple_tbl" with records taken from the road information table
+        scraped where each row has data for one road section.
 
-            (1) un arreglo con la tabla con todos los tramos de la ruta con un
-            codigo al principio identificador del tramo
-
-            (2) un diccionario con todas las tablas "ver detalle" de aquellos tramos
-            que no tienen promedio anual de la composicion pero si tienen un censo cobertura
-
-            (3) un arreglo que almacena todos los datos "ver detalle" incluso de los tramos
-            que no los tienen (con dicts vacios)
+        Feed "details_tbl" with records taken from special details links found
+        at some rows (ie, for some road sections) of the previous table. These
+        have tables with more detailed information that are scraped and turned
+        into records.
         """
 
         # parse base_url into a beautiful soup
@@ -118,7 +111,7 @@ class RoadScraper():
                 # add new row to the simple_tbl
                 self.simple_tbl.append(row)
 
-        #
+        # add records taken from detail tables to the details_tbl
         self._create_details_tbl(all_detail_tables)
 
     def get_simple_records(self):
@@ -139,11 +132,31 @@ class RoadScraper():
         return row_elements[6].find_all("a")[0]["href"]
 
     def _extract_detail_tables(self, details_link):
-        """Extract all tables from a static url.
+        """Extract all detail tables from a static url.
 
-        Returns a dictionary where first index (1) is table id, second index
-        (2) is row number (headers are first row) and third index (3) is the
-        row variable name.
+        Returns a dictionary with "id_table" as keys. Each table is represented
+        as a list of lists.
+
+        Arg:
+        "http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_2010/html_tramos/8511.html"
+
+        Return:
+        {u'clasificacion': [[u'A\xf1o', u'Mes', u'Horas', u'Autos y Ctas.',
+                             u'Bus', u'S/A', u'C/A', u'Semi', u'TMD',
+                             u'Cant. Puestos'],
+                            [u'2010', u'3', u'48', u'74,2', u'4,2', u'8,4',
+                             u'2,3', u'10,9', u'436', u'1'],
+                            [u'2010', u'6', u'48', u'68,3', u'2,4', u'9,1',
+                             u'4,5', u'15,7', u'290', u'1']],
+
+         u'ruta': [[u'N\xba Distrito', u'Distrito', u'L\xedmites del Tramo',
+                    u'Ini.', u'Fin', u'TMDA'],
+                   [u'23', u'Santa Cruz', u'RIO TURBIO (I) - INT.R.P.7',
+                    u'394,43', u'469,54', u'500']],
+
+         u'velocidad': [[u'Estimador', u'Liv', u'Otros'],
+                        [u'P85', u'135,6', u'103,8'],
+                        [u'VM', u'110,4', u'84,7']]}
         """
 
         # parse details link into a beautiful soup
@@ -192,80 +205,125 @@ class RoadScraper():
         return extracted_tables
 
     def _create_details_tbl(self, all_detail_tables):
+        """Create records from detail tables list adding them to details_tbl.
 
-        # itera con un indice por todos los tramos de la ruta
-        for i in xrange(len(all_detail_tables)):
+        Arg:
+        [
+        {u'clasificacion': [[u'A\xf1o', u'Mes', u'Horas', u'Autos y Ctas.',
+                             u'Bus', u'S/A', u'C/A', u'Semi', u'TMD',
+                             u'Cant. Puestos'],
+                            [u'2010', u'3', u'48', u'74,2', u'4,2', u'8,4',
+                             u'2,3', u'10,9', u'436', u'1'],
+         u'ruta': [[u'N\xba Distrito', u'Distrito', u'L\xedmites del Tramo',
+                    u'Ini.', u'Fin', u'TMDA'],
+                   [u'23', u'Santa Cruz', u'RIO TURBIO (I) - INT.R.P.7',
+                    u'394,43', u'469,54', u'500']]},
 
-            # toma el id del tramo
-            id_tramo = self.simple_tbl[i][0].strip()
+        {u'clasificacion': [[u'A\xf1o', u'Mes', u'Horas', u'Autos y Ctas.',
+                             u'Bus', u'S/A', u'C/A', u'Semi', u'TMD',
+                             u'Cant. Puestos'],
+                            [u'2010', u'3', u'48', u'74,2', u'4,2', u'8,4',
+                             u'2,3', u'10,9', u'436', u'1'],
+         u'ruta': [[u'N\xba Distrito', u'Distrito', u'L\xedmites del Tramo',
+                    u'Ini.', u'Fin', u'TMDA'],
+                   [u'23', u'Santa Cruz', u'RIO TURBIO (I) - INT.R.P.7',
+                    u'394,43', u'469,54', u'500']]}
+        ]
 
-            # itera entre las tablas "ver detalle" de ese tramo si es que las
-            # hay
-            if len(all_detail_tables[i]) > 0:
-                for tabla in all_detail_tables[i]:
+        Example records added to self.details_tbl:
+        ['0040_1', u'ruta', u'N\xba Distrito', 1, u'23']
+        ['0040_1', u'ruta', u'Distrito', 1, u'Santa Cruz']
+        ['0040_1', u'ruta', u'L\xedmites del Tramo', 1, u'RIO TURBIO (I) - INT.R.P.7']
+        ['0040_1', u'clasificacion', u'A\xf1o', 1, u'2010']
+        ['0040_1', u'clasificacion', u'Mes', 1, u'3']
+        ['0040_1', u'clasificacion', u'Horas', 1, u'48']
+        ['0040_1', u'clasificacion', u'Autos y Ctas.', 1, u'74,2']
 
-                    # toma el id de la tabla
-                    id_tabla = tabla
+        """
 
-                    # itera entre las coordenadas fila-columna de la tabla
-                    for nro_fila in xrange(len(all_detail_tables[i][tabla])):
-                        for nro_col in xrange(len(all_detail_tables[i][tabla][nro_fila])):
+        # iterate sections of a road
+        for num_section in xrange(len(all_detail_tables)):
 
-                            # si estamos en una fila con datos, no con encabezados
-                            # incorporamos el valor
-                            if nro_fila != 0:
+            # using the iteration index, get the section id from simple table
+            id_section = self.simple_tbl[num_section][0].strip()
 
-                                # tomo la variable
-                                variable = all_detail_tables[
-                                    i][tabla][0][nro_col].strip()
+            # check if there is any detail table of the section
+            if len(all_detail_tables[num_section]) > 0:
 
-                                # tomo el nro de fila o la instancia
-                                instancia = nro_fila
+                # iterate detail tabales of the section
+                for id_table in all_detail_tables[num_section]:
 
-                                # tomo el valor
-                                valor = all_detail_tables[i][
-                                    tabla][nro_fila][nro_col].strip()
+                    # get table
+                    table = all_detail_tables[num_section][id_table]
 
-                                # genero un nuevo registro con los datos tomados y
-                                # lo agrego al arreglo
-                                row = [
-                                    id_tramo, id_tabla, variable, instancia, valor]
-                                self.details_tbl.append(row)
+                    # iterate rows of the detail table
+                    for num_row in xrange(len(table)):
+
+                        # get row
+                        row = table[num_row]
+
+                        # iterate columns of the row
+                        for num_col in xrange(len(row)):
+
+                            # dont use first row (headers)
+                            if num_row != 0:
+
+                                # get variable of the table (header)
+                                variable = table[0][num_col].strip()
+
+                                # get the value
+                                value = row[num_col].strip()
+
+                                # create new record
+                                record = [id_section, id_table, variable,
+                                          num_row, value]
+                                print record
+
+                                # add new record to details table
+                                self.details_tbl.append(record)
 
 
 # DATA
 # scraping parameters
-metodo = "GET"
 base_url_part1 = "http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_"
 base_url_part2 = "/index.html"
 
 
 # METHODS
-def scrape_link_rutas(base_url, parser):
-    """ toma el url base de las rutas y devuelve un
-    diccionario con sus links """
+def scrape_road_links(year_base_url):
+    """Scrape road links from a year url and return them as a dictionary.
 
-    # toma el url base y lo convierte en una bs
-    soup_rutas = get_bs_from_static_site(base_url, parser)
+    Arg:
+    "http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_2010/index.html"
+
+    Return:
+    {u'0001': 'http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_2010/html_rutas/0001.html',
+     u'0003': 'http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_2010/html_rutas/0003.html',
+     u'0005': 'http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_2010/html_rutas/0005.html'}
+
+    """
+
+    # parse year url into beautiful soup
+    bs_roads = get_bs_from_static_site(year_base_url, PARSER)
 
     # extrae la tabla que contiene los links de las rutas
-    pares_clave_valor_soup = soup_rutas.find_all("td", {"class": "FILA"})
+    bs_key_value_pairs = bs_roads.find_all("td", {"class": "FILA"})
 
     # para cada regitro de la tabla extrae el texto y el link
-    dict_rutas = {}
-    for element in pares_clave_valor_soup:
+    road_links = {}
+    for element in bs_key_value_pairs:
         dict_temp = extract_key_value_pairs_from_bs(element, "a", "href")
-        dict_rutas[dict_temp[dict_temp.keys()[0]]] = dict_temp.keys()[0]
+        road_links[dict_temp[dict_temp.keys()[0]]] = dict_temp.keys()[0]
 
     # toma la lista de las rutas cuyos links fueron scrapeados
-    lista_rutas = dict_rutas.keys()
+    roads_list = road_links.keys()
 
     # convierte los link_parts de las rutas en links completos agregandole la
     # url base
-    for ruta in lista_rutas:
-        dict_rutas[ruta] = urljoin(base_url, dict_rutas[ruta])
+    for road in roads_list:
+        road_links[road] = urljoin(year_base_url, road_links[road])
 
-    return dict_rutas
+    return road_links
 
 
 def scrape_traffic_data(years, roads=None, excel_output=None):
@@ -288,11 +346,11 @@ def scrape_traffic_data(years, roads=None, excel_output=None):
         print "Taking data from year: ", year, "\n\n"
 
         # scrape road links for that year
-        dict_rutas = scrape_link_rutas(year_base_url, PARSER)
+        road_links = scrape_road_links(year_base_url)
 
         # if not roads provided, get them all
         if not roads:
-            roads = dict_rutas.keys()
+            roads = road_links.keys()
 
         # iterate roads
         for road in roads:
@@ -300,7 +358,7 @@ def scrape_traffic_data(years, roads=None, excel_output=None):
             print "\nTaking data from road: ", road, " at year: ", year, "\n"
 
             # create scraper for road and scrape it
-            road_scraper = RoadScraper(road, dict_rutas[road], dict_rutas)
+            road_scraper = RoadScraper(road, road_links[road], road_links)
             road_scraper.scrape()
 
             # write each simple record scraped to excel
@@ -321,7 +379,6 @@ def main():
     roads = ["0040"]
 
     scrape_traffic_data(years, roads)
-
 
 if __name__ == '__main__':
     main()
