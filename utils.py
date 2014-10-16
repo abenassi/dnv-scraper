@@ -1,7 +1,35 @@
 import urllib2
 from bs4 import BeautifulSoup
 import unicodedata
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
+from pprint import pprint
+
+
+def compare_excels(excel1, excel2):
+    """Compare two excels based on row iteration."""
+
+    # load workbooks
+    wb1 = load_workbook(excel1, use_iterators=True)
+    wb2 = load_workbook(excel2, use_iterators=True)
+
+    # check if sheets have same names
+    if not wb1.get_sheet_names() == wb2.get_sheet_names():
+        return False
+
+    # iterate sheets
+    for ws1, ws2 in zip(wb1.worksheets, wb2.worksheets):
+
+        # iterate rows
+        for row1, row2 in zip(ws1.iter_rows(), ws2.iter_rows()):
+
+            # iterate cells
+            for cell1, cell2 in zip(row1, row2):
+
+                # evaluate cells value for equality
+                if not cell1.value == cell2.value:
+                    return False
+
+    return True
 
 
 def get_html_from_static_site(url):

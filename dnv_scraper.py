@@ -17,7 +17,7 @@ class RoadScraper():
     """Scraper for data of a single road.
 
     A road has a table where each row has data of a section of the road. All
-    sections have data in this "simple_table" (the table accessed just with the
+    sections have data in this "simple_tbl" (the table accessed just with the
     road link).
 
     Some of them may also have a link to detail tables with more
@@ -40,10 +40,11 @@ class RoadScraper():
 
         # results
         self.tabla_ruta_ver_detalle_dict = {}
-        self.tabla_ruta_ver_detalle_db = []
 
-        self.simple_table = []
         self.detail_tables = []
+
+        self.simple_tbl = []
+        self.details_tbl = []
 
     # PUBLIC
     def scrape(self):
@@ -67,6 +68,7 @@ class RoadScraper():
         # crea los arreglos y diccionarios que seran Return Values de la
         # funcion
         tabla_ruta_censo_cobertura = {}
+        all_detail_tables = []
 
         id_section = 0
         # iterate rows
@@ -107,28 +109,26 @@ class RoadScraper():
                     detail_tables = self._extract_detail_tables(link_details)
 
                     # add new tables to detail_tables
-                    self.detail_tables.append(detail_tables)
+                    all_detail_tables.append(detail_tables)
 
                 # if has no details, append empty string instead of a link
                 else:
                     row.append("")
 
-                # add new row to the simple_table
-                self.simple_table.append(row)
+                # add new row to the simple_tbl
+                self.simple_tbl.append(row)
 
-        # transforma el diccionario de tablas de "ver detalle" en un arreglo tipo
-        # tabla base de datos para excel
-        self.tabla_ruta_ver_detalle_db = self._transformar_ver_detalle_dict_en_tabla(
-            self.simple_table, self.detail_tables)
+        #
+        self._create_details_tbl(all_detail_tables)
 
     def get_simple_records(self):
 
-        for row in self.simple_table:
+        for row in self.simple_tbl:
             yield row
 
     def get_details_records(self):
 
-        for row in self.tabla_ruta_ver_detalle_db:
+        for row in self.details_tbl:
             yield row
 
     # PRIVATE
@@ -191,52 +191,46 @@ class RoadScraper():
 
         return extracted_tables
 
-    def _transformar_ver_detalle_dict_en_tabla(self, tabla_ruta,
-                                               tabla_ruta_ver_detalle_dict):
-
-        # se crea el RV
-        tabla_ruta_ver_detalle_db = []
+    def _create_details_tbl(self, all_detail_tables):
 
         # itera con un indice por todos los tramos de la ruta
-        for i in list(xrange(len(tabla_ruta_ver_detalle_dict))):
+        for i in xrange(len(all_detail_tables)):
 
             # toma el id del tramo
-            id_tramo = tabla_ruta[i][0].strip()
+            id_tramo = self.simple_tbl[i][0].strip()
 
             # itera entre las tablas "ver detalle" de ese tramo si es que las
             # hay
-            if len(tabla_ruta_ver_detalle_dict[i]) > 0:
-                for tabla in tabla_ruta_ver_detalle_dict[i]:
+            if len(all_detail_tables[i]) > 0:
+                for tabla in all_detail_tables[i]:
 
                     # toma el id de la tabla
                     id_tabla = tabla
 
                     # itera entre las coordenadas fila-columna de la tabla
-                    for nro_fila in list(xrange(len(tabla_ruta_ver_detalle_dict[i][tabla]))):
-                        for nro_col in list(xrange(len(tabla_ruta_ver_detalle_dict[i][tabla][nro_fila]))):
+                    for nro_fila in xrange(len(all_detail_tables[i][tabla])):
+                        for nro_col in xrange(len(all_detail_tables[i][tabla][nro_fila])):
 
                             # si estamos en una fila con datos, no con encabezados
                             # incorporamos el valor
                             if nro_fila != 0:
 
                                 # tomo la variable
-                                variable = tabla_ruta_ver_detalle_dict[
+                                variable = all_detail_tables[
                                     i][tabla][0][nro_col].strip()
 
                                 # tomo el nro de fila o la instancia
                                 instancia = nro_fila
 
                                 # tomo el valor
-                                valor = tabla_ruta_ver_detalle_dict[i][
+                                valor = all_detail_tables[i][
                                     tabla][nro_fila][nro_col].strip()
 
                                 # genero un nuevo registro con los datos tomados y
                                 # lo agrego al arreglo
                                 row = [
                                     id_tramo, id_tabla, variable, instancia, valor]
-                                tabla_ruta_ver_detalle_db.append(row)
-
-        return tabla_ruta_ver_detalle_db
+                                self.details_tbl.append(row)
 
 
 # DATA
@@ -244,9 +238,6 @@ class RoadScraper():
 metodo = "GET"
 base_url_part1 = "http://transito.vialidad.gov.ar:8080/SelCE_WEB/tmda_libro_web_"
 base_url_part2 = "/index.html"
-
-# other parameters
-years = [str(year) for year in list(xrange(2010, 2011))]
 
 
 # METHODS
@@ -277,34 +268,39 @@ def scrape_link_rutas(base_url, parser):
     return dict_rutas
 
 
-def main():
+def scrape_traffic_data(years, roads=None, excel_output=None):
+    """Scrape traffic data from DNV webiste.
+
+    Uses TrafficData to write results and RoadScraper to scrape one year-road
+    at a time. Scrape all roads for years passed. If no roads are passed,
+    it takes data from all of them."""
 
     # create a TrafficData object to store scraped data
     traffic_data = TrafficData()
 
-    # llamado principal
-    # itera por todos los años
-    for anio in years:
+    # iterate years
+    for year in years:
 
-        # forma el url base
-        anio_base_url = base_url_part1 + anio + base_url_part2
+        # create base_url for year
+        year_base_url = base_url_part1 + year + base_url_part2
 
-        print "\n\nTomando datos del link base: ", anio_base_url
-        print "Tomando datos del anio: ", anio, "\n\n"
+        print "\n\nTaking data from year url: ", year_base_url
+        print "Taking data from year: ", year, "\n\n"
 
-        # toma los links de las rutas
-        dict_rutas = scrape_link_rutas(anio_base_url, PARSER)
-        #~ lista_rutas = dict_rutas.keys()
-        lista_rutas = ["0040"]
+        # scrape road links for that year
+        dict_rutas = scrape_link_rutas(year_base_url, PARSER)
 
-        # itera por todas las rutas de ese año
-        for ruta in lista_rutas:
+        # if not roads provided, get them all
+        if not roads:
+            roads = dict_rutas.keys()
 
-            print "\nTomando los datos de la ruta: ", ruta, " en el anio: ",
-            anio, "\n"
+        # iterate roads
+        for road in roads:
+
+            print "\nTaking data from road: ", road, " at year: ", year, "\n"
 
             # create scraper for road and scrape it
-            road_scraper = RoadScraper(ruta, dict_rutas[ruta], dict_rutas)
+            road_scraper = RoadScraper(road, dict_rutas[road], dict_rutas)
             road_scraper.scrape()
 
             # write each simple record scraped to excel
@@ -316,7 +312,15 @@ def main():
                 traffic_data.write_details_record(record)
 
         # save excel with all traffic data scraped
-        traffic_data.save()
+        traffic_data.save(excel_output)
+
+
+def main():
+
+    years = [str(year) for year in list(xrange(2010, 2011))]
+    roads = ["0040"]
+
+    scrape_traffic_data(years, roads)
 
 
 if __name__ == '__main__':
