@@ -9,9 +9,10 @@ class TrafficData():
     WS_DETAILS_TBL_NAME = "ver_detalle"
     FIELDS_SIMPLE_TBL = ["id_tramo", "Nro distrito", "Distrito",
                          "Limites del tramo", "Ini", "Fin", "TMDA", "Mas Info",
-                         "Observaciones", "Link"]
-    FIELDS_DETAILS_TBL = ["id_tramo", "id_tabla", "variable", "fila", "valor"]
-    EXCEL_OUTPUT = "Datos de TMDA de la DNV - 2010 - corregido ruta 40.xlsx"
+                         "Observaciones", "Link", "Anio"]
+    FIELDS_DETAILS_TBL = ["id_tramo", "id_tabla", "variable", "fila", "valor",
+                          "Anio"]
+    EXCEL_OUTPUT = "test_dnv_scraper.xlsx"
 
     def __init__(self):
 

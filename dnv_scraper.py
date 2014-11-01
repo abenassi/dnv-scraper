@@ -76,7 +76,7 @@ class RoadScraper():
                 # new section has been found
                 id_section += 1
                 section_code = "{}_{}".format(self.road_name, id_section)
-                print "Procesando tramo ", section_code
+                # print "Procesando tramo ", section_code
 
                 # init a new row with section code
                 row = [section_code]
@@ -277,7 +277,7 @@ class RoadScraper():
                                 # create new record
                                 record = [id_section, id_table, variable,
                                           num_row, value]
-                                print record
+                                # print record
 
                                 # add new record to details table
                                 self.details_tbl.append(record)
@@ -327,13 +327,12 @@ def scrape_road_links(year_base_url):
 
 
 def scrape_traffic_data(years, roads=None, excel_output=None):
-    """Scrape traffic data from DNV webiste.
+    """Scrape traffic data from DNV website.
 
     Uses TrafficData to write results and RoadScraper to scrape one year-road
     at a time. Scrape all roads for years passed. If no roads are passed,
     it takes data from all of them."""
 
-    # create a TrafficData object to store scraped data
     traffic_data = TrafficData()
 
     # iterate years
@@ -341,9 +340,6 @@ def scrape_traffic_data(years, roads=None, excel_output=None):
 
         # create base_url for year
         year_base_url = base_url_part1 + year + base_url_part2
-
-        print "\n\nTaking data from year url: ", year_base_url
-        print "Taking data from year: ", year, "\n\n"
 
         # scrape road links for that year
         road_links = scrape_road_links(year_base_url)
@@ -355,7 +351,7 @@ def scrape_traffic_data(years, roads=None, excel_output=None):
         # iterate roads
         for road in roads:
 
-            print "\nTaking data from road: ", road, " at year: ", year, "\n"
+            print "\nTaking data from road: ", road, " at year: ", year
 
             # create scraper for road and scrape it
             road_scraper = RoadScraper(road, road_links[road], road_links)
@@ -363,22 +359,22 @@ def scrape_traffic_data(years, roads=None, excel_output=None):
 
             # write each simple record scraped to excel
             for record in road_scraper.get_simple_records():
-                traffic_data.write_simple_record(record)
+                traffic_data.write_simple_record(record + [year])
 
             # write each details record scraped to excel
             for record in road_scraper.get_details_records():
-                traffic_data.write_details_record(record)
+                traffic_data.write_details_record(record + [year])
 
-        # save excel with all traffic data scraped
-        traffic_data.save(excel_output)
+    # save excel with all traffic data scraped
+    traffic_data.save(excel_output)
 
 
 def main():
 
-    years = [str(year) for year in list(xrange(2010, 2011))]
-    roads = ["0040"]
+    years = [str(year) for year in list(xrange(2006, 2014))]
+    roads = ["0014"]
 
-    scrape_traffic_data(years, roads)
+    scrape_traffic_data(years, roads, "Trafico ruta 14 - 2006 a 2013.xlsx")
 
 if __name__ == '__main__':
     main()
