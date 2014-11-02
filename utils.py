@@ -112,12 +112,11 @@ def write_ws(ws, record, fields):
         ws.append(fields)
 
     # add new row, with fields order
-    else:
-        new_row = []
+    new_row = []
 
-        # extract data with field keys from record
-        for field in fields:
-            new_row.append(record[field])
+    # extract data with field keys from record
+    for field in fields:
+        new_row.append(record[field])
 
-        # add new row to worksheet
-        ws.append(new_row)
+    # add new row to worksheet
+    ws.append(new_row)

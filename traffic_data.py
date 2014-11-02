@@ -26,6 +26,14 @@ class TrafficData():
         self.ws_details = self.wb.create_sheet(title=self.WS_DETAILS_TBL_NAME)
 
     # PUBLIC
+    @classmethod
+    def get_simple_tbl_fields(self):
+        return self.FIELDS_SIMPLE_TBL
+
+    @classmethod
+    def get_details_tbl_fields(self):
+        return self.FIELDS_DETAILS_TBL
+
     def write_simple_record(self, record):
         dict_record = dict(zip(self.FIELDS_SIMPLE_TBL, record))
         write_ws(self.ws_simple, dict_record, self.FIELDS_SIMPLE_TBL)

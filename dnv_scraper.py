@@ -63,6 +63,10 @@ class RoadScraper():
         tabla_ruta_censo_cobertura = {}
         all_detail_tables = []
 
+        # add empty row to simple_table (there will be field names there)
+        num_simple_tbl_fields = len(TrafficData.get_simple_tbl_fields())
+        # self.simple_tbl.append([""] * num_simple_tbl_fields)
+
         id_section = 0
         # iterate rows
         for tr in bs_road.find_all("tr"):
@@ -277,7 +281,6 @@ class RoadScraper():
                                 # create new record
                                 record = [id_section, id_table, variable,
                                           num_row, value]
-                                # print record
 
                                 # add new record to details table
                                 self.details_tbl.append(record)
@@ -351,7 +354,7 @@ def scrape_traffic_data(years, roads=None, excel_output=None):
         # iterate roads
         for road in roads:
 
-            print "\nTaking data from road: ", road, " at year: ", year
+            print "Taking data from road: ", road, " at year: ", year
 
             # create scraper for road and scrape it
             road_scraper = RoadScraper(road, road_links[road], road_links)
@@ -374,7 +377,7 @@ def main():
     years = [str(year) for year in list(xrange(2006, 2014))]
     roads = ["0014"]
 
-    scrape_traffic_data(years, roads, "Trafico ruta 14 - 2006 a 2013.xlsx")
+    scrape_traffic_data(years, roads, "Trafico ruta 14 - 2006 a 2013 - TEST.xlsx")
 
 if __name__ == '__main__':
     main()
