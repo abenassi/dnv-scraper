@@ -21,57 +21,57 @@ parameters:
 2. Roads (one road, or many separated by commas)
 3. Years (one year, or many separated by commas) - Starting at 2006
 
-´´´cmd
+```cmd
 python dnv_scraper.py some_traffic_data.xlsx 0014,0003 2006,2008,2013
-´´´
+```
 
 Parameters are optional. You could call just the script alone to scrape all
 data (all roads, all years from 2006 up to last year) or add less than three
 parameters (always in excel-roads-years order).
 
-´´´cmd
+```cmd
 python dnv_scraper.py
 python dnv_scraper.py some_traffic_data.xlsx
 python dnv_scraper.py some_traffic_data.xlsx 0014,0003
-´´´
+```
 
 ## Imports
 
 You could also import ´scrape_traffic_data´ method from inside the directory
 method and use it.
 
-´´´python
+```python
 from dnv_scraper import scrape_traffic_data
 years = [2006, 2008, 2013]
 roads = ["0014", "0003"]
 excel_output = "some_traffic_data.xlsx"
 scrape_traffic_data(years, roads, excel_output)
-´´´
+```
 
 Again, parameters could be "None" or not passed at all.
 
-´´´python
+```python
 from dnv_scraper import scrape_traffic_data
 scrape_traffic_data()
-´´´
+```
 
 Also, you could call parameters with keyword arguments.
-´´´python
+```python
 from dnv_scraper import scrape_traffic_data
 scrape_traffic_data(years=[2006, 2013], roads=["0014"])
-´´´
+```
 
 ## Test
 
 To test the proper functioning of the module you can run the unit test.
 
-´´´cmd
+```cmd
 python test_dnv_scraper.py
-´´´
+```
 
 Or from inside the directory.
 
-´´´python
+```python
 import test_dnv_scraper
 test_dnv_scraper.main()
-´´´
+```
