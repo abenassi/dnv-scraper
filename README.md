@@ -12,6 +12,8 @@ I am currently heavy-refactoring and translating into english old pieces
 of code from my scratch starts as a self-taught programmer, this one got fairly
 prettier but some pieces of code are still obscure. It works very well anyway.
 
+You can download or clone the repository on your local computer to use it.
+
 ## Command-line interface
 
 It can be called through command line interface passing from zero to 3
