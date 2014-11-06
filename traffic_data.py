@@ -12,7 +12,7 @@ class TrafficData():
                          "Observaciones", "Link", "Anio"]
     FIELDS_DETAILS_TBL = ["id_tramo", "id_tabla", "variable", "fila", "valor",
                           "Anio"]
-    EXCEL_OUTPUT = "test_dnv_scraper.xlsx"
+    EXCEL_OUTPUT = "dnv_traffic_data.xlsx"
 
     def __init__(self):
 

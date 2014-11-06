@@ -5,6 +5,9 @@ from utils import (get_bs_from_static_site, extract_key_value_pairs_from_bs,
                    remove_accents)
 from pprint import pprint
 from traffic_data import TrafficData
+import argparse
+import sys
+import datetime
 
 PARSER = "lxml"
 
@@ -329,20 +332,26 @@ def scrape_road_links(year_base_url):
     return road_links
 
 
-def scrape_traffic_data(years, roads=None, excel_output=None):
+def scrape_traffic_data(years=None, roads=None, excel_output=None):
     """Scrape traffic data from DNV website.
 
     Uses TrafficData to write results and RoadScraper to scrape one year-road
     at a time. Scrape all roads for years passed. If no roads are passed,
     it takes data from all of them."""
 
+    # if years not passed, scrape all (2006 up to last year)
+    if not years:
+        today_year = datetime.date.today().timetuple().tm_year
+        years = list(xrange(2006, today_year))
+
+    # create object where data will be stored
     traffic_data = TrafficData()
 
     # iterate years
     for year in years:
 
         # create base_url for year
-        year_base_url = base_url_part1 + year + base_url_part2
+        year_base_url = base_url_part1 + str(year) + base_url_part2
 
         # scrape road links for that year
         road_links = scrape_road_links(year_base_url)
@@ -372,12 +381,27 @@ def scrape_traffic_data(years, roads=None, excel_output=None):
     traffic_data.save(excel_output)
 
 
-def main():
+def test():
 
-    years = [str(year) for year in list(xrange(2006, 2014))]
     roads = ["0014"]
+    scrape_traffic_data(years, roads, "Trafico ruta 14 - 2006 a 2013.xlsx")
 
-    scrape_traffic_data(years, roads, "Trafico ruta 14 - 2006 a 2013 - TEST.xlsx")
 
 if __name__ == '__main__':
-    main()
+
+    # init parameters as none
+    xl_output = None
+    roads = None
+    years = None
+
+    # parse parameters if they were submited
+    if len(sys.argv) > 1:
+        xl_output = sys.argv[1].split(",")
+
+    if len(sys.argv) > 2:
+        roads = sys.argv[2].split(",")
+
+    if len(sys.argv) > 3:
+        years = sys.argv[3]
+
+    scrape_traffic_data(years, roads, xl_output)
