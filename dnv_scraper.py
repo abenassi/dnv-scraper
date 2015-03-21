@@ -8,6 +8,7 @@ from traffic_data import TrafficData
 import argparse
 import sys
 import datetime
+from collections import OrderedDict
 
 PARSER = "lxml"
 
@@ -61,14 +62,8 @@ class RoadScraper():
         # parse base_url into a beautiful soup
         bs_road = get_bs_from_static_site(self.base_url, self.PARSER)
 
-        # crea los arreglos y diccionarios que seran Return Values de la
-        # funcion
-        tabla_ruta_censo_cobertura = {}
-        all_detail_tables = []
-
-        # add empty row to simple_table (there will be field names there)
-        num_simple_tbl_fields = len(TrafficData.get_simple_tbl_fields())
-        # self.simple_tbl.append([""] * num_simple_tbl_fields)
+        # return values of the method
+        all_detail_tables = OrderedDict()
 
         id_section = 0
         # iterate rows
@@ -107,9 +102,10 @@ class RoadScraper():
 
                     # extract all tables from link_details of the section
                     detail_tables = self._extract_detail_tables(link_details)
+                    # print section_code, link_details, detail_tables
 
                     # add new tables to detail_tables
-                    all_detail_tables.append(detail_tables)
+                    all_detail_tables[section_code] = detail_tables
 
                 # if has no details, append empty string instead of a link
                 else:
@@ -138,7 +134,8 @@ class RoadScraper():
     def _find_details_link(self, row_elements):
         return row_elements[6].find_all("a")[0]["href"]
 
-    def _extract_detail_tables(self, details_link):
+    @classmethod
+    def _extract_detail_tables(cls, details_link):
         """Extract all detail tables from a static url.
 
         Returns a dictionary with "id_table" as keys. Each table is represented
@@ -249,19 +246,17 @@ class RoadScraper():
         """
 
         # iterate sections of a road
-        for num_section in xrange(len(all_detail_tables)):
-
-            # using the iteration index, get the section id from simple table
-            id_section = self.simple_tbl[num_section][0].strip()
+        for section_code, detail_table in all_detail_tables.items():
+            # print section_code
 
             # check if there is any detail table of the section
-            if len(all_detail_tables[num_section]) > 0:
+            if len(detail_table) > 0:
 
                 # iterate detail tabales of the section
-                for id_table in all_detail_tables[num_section]:
+                for id_table in detail_table:
 
                     # get table
-                    table = all_detail_tables[num_section][id_table]
+                    table = detail_table[id_table]
 
                     # iterate rows of the detail table
                     for num_row in xrange(len(table)):
@@ -282,7 +277,7 @@ class RoadScraper():
                                 value = row[num_col].strip()
 
                                 # create new record
-                                record = [id_section, id_table, variable,
+                                record = [section_code, id_table, variable,
                                           num_row, value]
 
                                 # add new record to details table
